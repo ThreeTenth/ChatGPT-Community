@@ -181,9 +181,9 @@ class Router {
 
     // 0. 首页 `/`
 
-    if (pathname === "/") {
-      return path
-    }
+    // if (pathname === "/") {
+    //   return path
+    // }
 
     // 1. 先进行完全匹配
     for (let [name, compose] of this.composes) {

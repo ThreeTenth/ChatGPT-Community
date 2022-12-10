@@ -75,7 +75,8 @@ func main() {
 	})
 	router.GET("/", web)
 	router.GET("/:pagename", web)
-	router.GET("/api/v1/conversation", web)
+	router.GET("/api/v1/session", updateChatGPTSession)
+	router.GET("/api/v1/conversation", getChatGPTConversation)
 
 	router.Run(fmt.Sprint(":", config.Port))
 }

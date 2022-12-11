@@ -16,9 +16,9 @@ type User struct {
 // Fields of the User.
 func (User) Fields() []ent.Field {
 	return []ent.Field{
-		field.String("id").Unique(),
+		field.String("id").Unique().NotEmpty().StructTag(`json:"id"`),
 		field.String("name").Optional(),
-		field.String("email"),
+		field.String("email").NotEmpty().StructTag(`updatedAt:"email"`),
 		field.String("image").Optional(),
 		field.Strings("groups").Optional(),
 		field.Strings("features").Optional(),

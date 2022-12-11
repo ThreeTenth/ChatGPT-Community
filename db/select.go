@@ -16,7 +16,7 @@ func GetMessage(id string) (*ent.Message, error) {
 }
 
 // SaveMessage 保存消息
-func SaveMessage(id, content, contentType, role, conversationID, parentMessageID, userID string) error {
+func SaveMessage(id, content, contentType, role, conversationID, parentMessageID, userID string) (*ent.Message, error) {
 	return client.Message.Create().
 		SetID(id).
 		SetContent(content).
@@ -25,7 +25,7 @@ func SaveMessage(id, content, contentType, role, conversationID, parentMessageID
 		SetConversationID(conversationID).
 		SetParentMessageID(parentMessageID).
 		SetUserID(userID).
-		Exec(ctx)
+		Save(ctx)
 }
 
 // SaveUser 保存用户信息

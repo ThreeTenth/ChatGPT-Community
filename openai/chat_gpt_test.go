@@ -35,9 +35,9 @@ func TestChatGPTStream(t *testing.T) {
 		return
 	}
 
-	err = PostChatGPTStream(token.AccessToken, getTestChatRequestJSON("", testUUID(), "明月几时有，下一句"), func() {
+	_, err = PostChatGPTStream(token.AccessToken, getTestChatRequestJSON("", testUUID(), "明月几时有，下一句"), func() {
 		t.Log("Start response")
-	}, func(msg *ChatResponseJSON) (bool, error) {
+	}, func(msg *ChatResponseBody) (bool, error) {
 		t.Log(msg.Message.Content.Parts)
 		return true, nil
 	})
@@ -61,8 +61,8 @@ func getTestChatSessoin() (*Token, error) {
 	return UpdateChatGPTSession(sessionToken)
 }
 
-func getTestChatRequestJSON(conversationID, parentID, text string) ChatRequestJSON {
-	return ChatRequestJSON{
+func getTestChatRequestJSON(conversationID, parentID, text string) *ChatRequestBody {
+	return &ChatRequestBody{
 		Action:         "next",
 		ConversationID: conversationID,
 		Messages: []*ChatMessage{

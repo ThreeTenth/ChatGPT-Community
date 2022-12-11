@@ -44,8 +44,8 @@ type ChatContent struct {
 	Parts       []string `json:"parts"`        // 内容本身，作为字符串数组
 }
 
-// ChatRequestJSON 表示整个 JSON 数据。
-type ChatRequestJSON struct {
+// ChatRequestBody 表示整个 JSON 数据。
+type ChatRequestBody struct {
 	Action          string         `json:"action"`                    // 要执行的操作（例如，"next"）
 	ConversationID  string         `json:"conversation_id,omitempty"` // 会话的 ID
 	Messages        []*ChatMessage `json:"messages"`                  // 会话中的消息数组
@@ -73,8 +73,8 @@ type ChatResponseContent struct {
 	Parts       []string `json:"parts"`        // 内容部分
 }
 
-// ChatResponseJSON is backend-api/conversation 的回复结构体
-type ChatResponseJSON struct {
+// ChatResponseBody is backend-api/conversation 的回复结构体
+type ChatResponseBody struct {
 	Message        *ChatResponseMessage `json:"message"`         // 消息
 	ConversationID string               `json:"conversation_id"` // 对话 ID
 	Error          string               `json:"error,omitempty"` // 错误
@@ -82,9 +82,9 @@ type ChatResponseJSON struct {
 
 var chatGPTClient = &http.Client{}
 
-func getChatGPTConversationRespnose(accessToken string, chat ChatRequestJSON, contentType string) (*http.Response, error) {
+func getChatGPTConversationRespnose(accessToken string, chatRequestBody *ChatRequestBody, contentType string) (*http.Response, error) {
 	postURL := "https://chat.openai.com/backend-api/conversation"
-	requestBody := chat
+	requestBody := chatRequestBody
 	requestBodyJSON, err := json.Marshal(&requestBody)
 	if err != nil {
 		return nil, err
@@ -111,21 +111,21 @@ func getChatGPTConversationRespnose(accessToken string, chat ChatRequestJSON, co
 
 // PostChatGPTStream 提交一个 https://chat.openai.com/backend-api/conversation 请求
 // 并获取一个 "text/event-stream" 格式的回复
-func PostChatGPTStream(accessToken string, chat ChatRequestJSON, onConnectioned func(), stream func(msg *ChatResponseJSON) (bool, error)) error {
+func PostChatGPTStream(accessToken string, chatRequestBody *ChatRequestBody, onConnectioned func(), stream func(msg *ChatResponseBody) (bool, error)) (*ChatResponseBody, error) {
 	// 发起请求
-	response, err := getChatGPTConversationRespnose(accessToken, chat, "text/event-stream")
+	response, err := getChatGPTConversationRespnose(accessToken, chatRequestBody, "text/event-stream")
 	if err != nil {
 		// 处理错误
-		return err
+		return nil, err
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusOK {
 		resBodyUnicode, err := ioutil.ReadAll(response.Body)
 		if err != nil {
-			return fmt.Errorf("%v\n%v", response.Status, err)
+			return nil, fmt.Errorf("%v\n%v", response.Status, err)
 		}
-		return fmt.Errorf("%v\n%v", response.Status, string(resBodyUnicode))
+		return nil, fmt.Errorf("%v\n%v", response.Status, string(resBodyUnicode))
 	}
 
 	// 创建一个文本扫描器
@@ -135,7 +135,7 @@ func PostChatGPTStream(accessToken string, chat ChatRequestJSON, onConnectioned 
 	scanner.Split(bufio.ScanLines)
 
 	// 创建一个回复结构体
-	msg := ChatResponseJSON{}
+	msg := ChatResponseBody{}
 	ok := true
 
 	onConnectioned()
@@ -155,18 +155,18 @@ func PostChatGPTStream(accessToken string, chat ChatRequestJSON, onConnectioned 
 		} else {
 			ok, err = stream(&msg)
 			if !ok {
-				return err
+				return nil, err
 			}
 		}
 	}
 
-	return nil
+	return &msg, nil
 }
 
 // PostChatGPTText 提交一个 https://chat.openai.com/backend-api/conversation 请求
 // 并获取一个 "application/json" 格式的回复
-func PostChatGPTText(accessToken string, chat ChatRequestJSON) (*ChatResponseJSON, error) {
-	response, err := getChatGPTConversationRespnose(accessToken, chat, "application/json")
+func PostChatGPTText(accessToken string, chatRequestBody *ChatRequestBody) (*ChatResponseBody, error) {
+	response, err := getChatGPTConversationRespnose(accessToken, chatRequestBody, "application/json")
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +194,7 @@ func PostChatGPTText(accessToken string, chat ChatRequestJSON) (*ChatResponseJSO
 	lastLine = lastLine[6:]
 
 	// 创建一个回复结构体
-	msg := ChatResponseJSON{}
+	msg := ChatResponseBody{}
 	if err = json.Unmarshal([]byte(lastLine), &msg); err != nil {
 		return nil, err
 	}

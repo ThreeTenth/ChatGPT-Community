@@ -17,11 +17,11 @@ import (
 
 // Config is 服务启动配置文件
 type Config struct {
-	Pg    string
-	Port  int
-	Mode  log.Level
-	Log   string
-	Debug bool
+	Pg    string `json:"pg"`
+	Port  int    `json:"port"`
+	Mode  int    `json:"mode"`
+	Log   string `json:"log"`
+	Debug bool   `json:"debug"`
 }
 
 var config *Config
@@ -41,10 +41,10 @@ func main() {
 	}
 
 	if config == nil {
-		config = &Config{"postgres:123456@localhost:5432/chatgpt-community", 30039, log.WarnLevel, "../logcat.log", true}
+		config = &Config{"postgres:123456@localhost:5432/chatgpt-community", 30039, int(log.WarnLevel), "../logcat.log", true}
 	}
 
-	log.SetLevel(config.Mode)
+	log.SetLevel(log.Level(config.Mode))
 	log.SetFormatter(&log.JSONFormatter{
 		TimestampFormat: "2006-01-02 15:04:05",
 	})

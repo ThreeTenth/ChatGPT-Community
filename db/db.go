@@ -10,6 +10,7 @@ import (
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
+	_ "github.com/jackc/pgx/v4/stdlib"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -50,7 +51,7 @@ func OpenPostgreSQL(source string, debug bool) {
 
 	ctx = context.Background()
 	err = client.Schema.Create(ctx,
-		migrate.WithGlobalUniqueID(true),
+		// migrate.WithGlobalUniqueID(true),
 		migrate.WithDropIndex(true),
 		migrate.WithDropColumn(true),
 	)

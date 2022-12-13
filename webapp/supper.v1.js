@@ -51,6 +51,28 @@ class State {
     this.data = data;
   }
 
+  equalURL(state) {
+    if (state) {
+      if (state instanceof State) {
+        return this.url === state.url
+      } else {
+        throw new Error("state isn't State class")
+      }
+    }
+    return false
+  }
+
+  equalName(state) {
+    if (state) {
+      if (state instanceof State) {
+        return this.path.name === state.path.name
+      } else {
+        throw new Error("state isn't State class")
+      }
+    }
+    return false
+  }
+
   get url() {
     if (this.path instanceof Path) {
       return this.path.url
@@ -61,7 +83,12 @@ class State {
   static Create(state) {
     if (!state) return null
     let newState = new State()
-    newState.path = state.path;
+    newState.path = new Path(
+      state.path.name,
+      state.path.params,
+      state.path.query,
+      state.path.hash,
+    );
     newState.title = state.title;
     newState.data = state.data;
     return newState
@@ -72,14 +99,46 @@ class Context {
   /**
   
   创建一个上下文对象。
+  @param {Function} handlers - 当前上下文的状态。
   @param {State} state - 当前上下文的状态。
   @param {State} from - 当前上下文的来源。
   @param {boolean} isHistory - 当前上下文是否是历史记录。
   */
-  constructor(state, from, isHistory) {
+  constructor(handlers, state, from, isHistory) {
+    this.handlers = handlers
     this.state = state;
     this.from = from;
     this.isHistory = isHistory;
+    this.isAbout = false;
+  }
+
+  next() {
+    if (!this.isAbout && 0 < this.handlers.length) {
+      let handle = this.handlers.shift()
+      handle(this)
+    }
+  }
+
+  abort() {
+    this.isAbout = true
+  }
+
+  /**
+   * 推送当前路由状态到历史记录
+   * @param {boolean} isCreate 是否新建历史记录
+   */
+  push(isCreate = true) {
+    if (this.from) {
+      if (this.isHistory) {
+        Router.pushHistoryState(this.state, false)
+      } else if (this.state.equalName(this.from)) {
+        Router.pushHistoryState(this.state, isCreate)
+      } else {
+        Router.pushHistoryState(this.state, true)
+      }
+    } else {
+      Router.pushHistoryState(this.state, false)
+    }
   }
 }
 
@@ -89,11 +148,22 @@ class Router {
 
     // 单面应用的路由历史
     window.onpopstate = (e) => {
-      router.onpopstate(e)
+      this.onpopstate(e)
     }
   }
 
-  bind(pathname, compose) {
+  /**
+   * 未找到页面的路由函数
+   * @param {Context} c 路由状态
+   */
+  notFound(c) {
+    let p = document.createElement("p")
+    p.innerText = `404 Not Found (${c.state.url})`
+    document.body.appendChild(p)
+    c.push(false)
+  }
+
+  bind(pathname, ...compose) {
     this.composes.set(pathname, compose)
   }
   unbind(pathname) {
@@ -101,8 +171,7 @@ class Router {
   }
 
   launch() {
-    let path = this.encodeURLState(window.location.href)
-    let state = new State(path, document.title, {}, false)
+    let state = new State(window.location.href, document.title, {}, false)
     this.start(state)
   }
 
@@ -123,12 +192,20 @@ class Router {
    * @param {boolean} isHistory 此状态是否为历史数据
    */
   __start(state, isHistory = false) {
-    let compose = this.composes.get(state.path.name)
-    if (compose) {
-      compose(new Context(state, State.Create(history.state), isHistory))
-    } else {
-      throw new Error("Could not find the component represented by state")
+    let toHandlers = this.composes.get(state.path.name)
+    if (!toHandlers) {
+      toHandlers = [this.notFound]
     }
+    toHandlers = toHandlers.slice()
+    let from = State.Create(history.state)
+    let fromHandlers = this.composes.get(from.path.name)
+    if (!fromHandlers) {
+      fromHandlers = [this.notFound]
+    }
+    fromHandlers = fromHandlers.slice()
+    // Bug: 组件退出时，如何通知让组件销毁？
+    new Context(fromHandlers, from, state, true).next()
+    new Context(toHandlers, state, from, isHistory).next()
   }
 
   back() {
@@ -144,7 +221,7 @@ class Router {
    * @param {State} state 推送浏览器历史状态
    * @returns 
    */
-  pushHistoryState(state, push = false) {
+  static pushHistoryState(state, push = false) {
     if (!(state instanceof State)) {
       throw new Error("pushState error: state type isn't State class")
     }
@@ -181,9 +258,9 @@ class Router {
 
     // 0. 首页 `/`
 
-    // if (pathname === "/") {
-    //   return path
-    // }
+    if (pathname === "/") {
+      return path
+    }
 
     // 1. 先进行完全匹配
     for (let [name, compose] of this.composes) {
@@ -194,15 +271,20 @@ class Router {
 
     /*
     2. 进行占位符匹配，格式：
-       /user/:id/:name
-       示例
-       /user/931/Ava?ref=google.com
-       匹配结果：
-       Path {
-        name: /user/:id/:name,
-        params: {id: 931, name: "Ava"},
-        query: {ref: "google.com"},
-        hash: null
+       /group/:id/*name
+       /group/10001/js?page=10&order=time#13
+       解析如下：
+       path: {
+          name: "/group/:id/*name",
+          params: {
+            id: "10001",
+            name: "js"
+          },
+          query: {
+            page: "10",
+            order: "time"
+          },
+          hash: "13"
        }
     */
     for (let [name, compose] of this.composes) {
@@ -214,10 +296,10 @@ class Router {
       group.forEach(node => {
         if (node[0] === ":") {
           regexArray.push(`([^\?\/\#]+)`)
-          params[node.substring(1)] = ""
+          params[node.substring(1)] = ":"
         } else if (node[0] === "*") {
           regexArray.push(`([^\?\/\#]*)`)
-          params[node.substring(1)] = ""
+          params[node.substring(1)] = "*"
         } else {
           regexArray.push(node)
         }
@@ -228,9 +310,18 @@ class Router {
         continue
       }
       let queryKeys = Object.keys(params)
+      let ok = true
       for (let i = 1; i < result.length; i++) {
         const element = result[i];
+        let param = params[queryKeys[i - 1]]
+        if (param === ":" && element === "") {
+          ok = false
+          break
+        }
         params[queryKeys[i - 1]] = element
+      }
+      if (!ok) {
+        continue
       }
 
       path.name = name

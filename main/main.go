@@ -60,7 +60,9 @@ func main() {
 		log.Panicln("Failed to log to file, using default stderr", err)
 	}
 
-	db.OpenPostgreSQL(config.Pg, config.Debug)
+	if config.Pg != "" {
+		db.OpenPostgreSQL(config.Pg, config.Debug)
+	}
 
 	if config.Debug {
 		gin.SetMode(gin.DebugMode)

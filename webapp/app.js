@@ -63,7 +63,8 @@ const threadState = new State("/thread", "线程")
 
 const router = new Router()
 
-router.bind("/", auth, indexCompose)
+router.use(auth)
+router.bind("/", indexCompose)
 // router.bind("/*name", _404Compose)
 
 router.launch()

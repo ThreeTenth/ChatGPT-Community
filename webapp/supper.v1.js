@@ -95,6 +95,16 @@ class State {
   }
 }
 
+/**
+ * 路由的上下文对象，包含：
+ * 
+ * 1、当前路由绑定的路由函数列表
+ * 2、当前路由的状态
+ * 3、当前路由的来源路由的状态
+ * 4、当前路由的状态是否从历史状态而来
+ * 
+ * @class Context
+ */
 class Context {
   /**
   
@@ -144,7 +154,9 @@ class Context {
 
 class Router {
   constructor() {
-    this.composes = new Map()
+    this.commonActivities = []
+    this.activities = new Map()
+    this.destroies = new Map()
 
     // 单面应用的路由历史
     window.onpopstate = (e) => {
@@ -158,16 +170,67 @@ class Router {
    */
   notFound(c) {
     let p = document.createElement("p")
+    p.id = '404'
+    p.style.position = 'fixed'
+    p.style.zIndex = 999
+    p.style.left = 0
+    p.style.right = 0
+    p.style.top = 0
+    p.style.bottom = 0
+    p.style.backgroundColor = "white"
     p.innerText = `404 Not Found (${c.state.url})`
     document.body.appendChild(p)
     c.push(false)
   }
 
+  notFoundDestroy() {
+    let _404 = document.getElementById("404")
+    if (_404) {
+      document.body.removeChild(_404)
+    }
+  }
+
+  /**
+   * 当指定路由被触发时，会始终先调用该函数列表。
+   * 可以用于作认证和鉴权等操作。
+   * 
+   * @param {...Function} compose 路由使用的通用函数列表
+   */
+  use(...compose) {
+    for (let i = 0; i < compose.length; i++) {
+      const element = compose[i];
+
+      this.commonActivities.push(element)
+    }
+  }
+
+  /**
+   * 绑定路由路径到指定的路由函数列表中
+   * 可以使用 [Context.next] 获取下一个函数。
+   * 
+   * 值得注意的是，该函数列表中，最后一个函数是该路由销毁时调用的函数。
+   * 如果只有一个函数，那么路由销毁时，不会调用任何函数。
+   * 
+   * 激活函数的参数为：{@link Context}。
+   * 销毁函数则没有参数。
+   * 
+   * @param {String} pathname 路由路径名称
+   * @param  {...Function} compose 路由函数，当函数数据大于 1 时，最后一个函数为路由销毁函数。
+   * @returns 
+   */
   bind(pathname, ...compose) {
-    this.composes.set(pathname, compose)
+    let count = compose.length
+    if (0 == count) {
+      return
+    }
+    if (1 < count) {
+      this.destroies.set(pathname, compose.pop())
+    }
+    this.activities.set(pathname, compose)
   }
   unbind(pathname) {
-    this.composes.delete(pathname)
+    this.activities.delete(pathname)
+    this.destroies.delete(pathname)
   }
 
   launch() {
@@ -192,20 +255,22 @@ class Router {
    * @param {boolean} isHistory 此状态是否为历史数据
    */
   __start(state, isHistory = false) {
-    let toHandlers = this.composes.get(state.path.name)
-    if (!toHandlers) {
-      toHandlers = [this.notFound]
+    let activitiyHandlers = this.activities.get(state.path.name)
+    if (!activitiyHandlers) {
+      activitiyHandlers = [this.notFound]
     }
-    toHandlers = toHandlers.slice()
+    activitiyHandlers = activitiyHandlers.slice()
+    activitiyHandlers.push(...this.commonActivities.slice())
+    if (isHistory) {
+      let destroiyHandler = this.destroies.get(state.path.name)
+      if (destroiyHandler) {
+        destroiyHandler()
+      } else {
+        this.notFoundDestroy()
+      }
+    }
     let from = State.Create(history.state)
-    let fromHandlers = this.composes.get(from.path.name)
-    if (!fromHandlers) {
-      fromHandlers = [this.notFound]
-    }
-    fromHandlers = fromHandlers.slice()
-    // Bug: 组件退出时，如何通知让组件销毁？
-    new Context(fromHandlers, from, state, true).next()
-    new Context(toHandlers, state, from, isHistory).next()
+    new Context(activitiyHandlers, state, from, isHistory).next()
   }
 
   back() {
@@ -263,7 +328,7 @@ class Router {
     }
 
     // 1. 先进行完全匹配
-    for (let [name, compose] of this.composes) {
+    for (let [name, compose] of this.activities) {
       if (name === pathname && compose) {
         return path
       }
@@ -287,7 +352,7 @@ class Router {
           hash: "13"
        }
     */
-    for (let [name, compose] of this.composes) {
+    for (let [name, compose] of this.activities) {
       if (!compose) continue
 
       let group = name.split("/")

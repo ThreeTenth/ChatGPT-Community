@@ -141,6 +141,8 @@ class Context {
     if (this.from) {
       if (this.isHistory) {
         Router.pushHistoryState(this.state, false)
+      } else if (this.state.equalURL(this.from)) {
+        Router.pushHistoryState(this.state, false)
       } else if (this.state.equalName(this.from)) {
         Router.pushHistoryState(this.state, isCreate)
       } else {
@@ -169,7 +171,7 @@ class Router {
    * @param {Context} c 路由状态
    */
   notFound(c) {
-    let p = document.createElement("p")
+    let p = document.createElement("div")
     p.id = '404'
     p.style.position = 'fixed'
     p.style.zIndex = 999

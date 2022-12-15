@@ -42,12 +42,10 @@ class State {
   /**
    * 
    * @param {string|Path} path 当前路由的路径对象
-   * @param {string} title 当前路由的标题
    * @param {object} data 当前路由的组件数据，用于显示。
    */
-  constructor(path, title, data = {}) {
+  constructor(path, data = {}) {
     this.path = path;
-    this.title = title;
     this.data = data;
   }
 
@@ -89,7 +87,6 @@ class State {
       state.path.query,
       state.path.hash,
     );
-    newState.title = state.title;
     newState.data = state.data;
     return newState
   }
@@ -154,9 +151,48 @@ class Context {
   }
 }
 
+class RouterGroup {
+  /**
+   * 
+   * @param {Router} router 路由
+   * @param {boolean} root 该路由组是否为根路由
+   * @param {String} basePath 路由组的基本路径
+   * @param {Array<Function>} handlers 路由组的通用激活函数
+   */
+  constructor(router, root, basePath, handlers = []) {
+    this.router = router
+    this.root = root
+    this.basePath = basePath
+    this.handlers = handlers
+  }
+
+  use(...handlers) {
+    this.handlers.push(...handlers)
+  }
+
+  bind(pathname, ...handlers) {
+    assert1(0 == handlers.length, "handlers can't empty")
+    let path = this.calculateAbsolutePath(pathname)
+    path = path.replace("//", "/")
+    if (1 == handlers.length) {
+      this.router.addRoute(path, ...this.handlers, ...handlers, this.empty)
+    } else {
+      this.router.addRoute(path, ...this.handlers, ...handlers)
+    }
+  }
+
+  empty() {
+
+  }
+
+  calculateAbsolutePath(relativePath) {
+    return `${this.basePath}${relativePath}`.replace(/\/+/g, '/')
+  }
+}
+
 class Router {
   constructor() {
-    this.commonActivities = []
+    this.rootGroup = new RouterGroup(this, true, "/", [])
     this.activities = new Map()
     this.destroies = new Map()
 
@@ -193,17 +229,27 @@ class Router {
   }
 
   /**
+   * 创建一个指定路径名称的路由组
+   * @param {String} pathname 路由路径名称
+   */
+  group(pathname, ...handlers) {
+    // todo 路由组的功能
+    return new RouterGroup(
+      this,
+      false,
+      this.rootGroup.calculateAbsolutePath(pathname),
+      ...handlers,
+    )
+  }
+
+  /**
    * 当指定路由被触发时，会始终先调用该函数列表。
    * 可以用于作认证和鉴权等操作。
    * 
    * @param {...Function} compose 路由使用的通用函数列表
    */
   use(...compose) {
-    for (let i = 0; i < compose.length; i++) {
-      const element = compose[i];
-
-      this.commonActivities.push(element)
-    }
+    this.rootGroup.use(...compose)
   }
 
   /**
@@ -221,6 +267,10 @@ class Router {
    * @returns 
    */
   bind(pathname, ...compose) {
+    this.rootGroup.bind(pathname, ...compose)
+  }
+
+  addRoute(pathname, ...compose) {
     let count = compose.length
     if (0 == count) {
       return
@@ -230,13 +280,9 @@ class Router {
     }
     this.activities.set(pathname, compose)
   }
-  unbind(pathname) {
-    this.activities.delete(pathname)
-    this.destroies.delete(pathname)
-  }
 
   launch() {
-    let state = new State(window.location.href, document.title, {}, false)
+    let state = new State(window.location.href, {}, false)
     this.start(state)
   }
 
@@ -248,7 +294,7 @@ class Router {
     if (typeof state.path === 'string') {
       state.path = this.encodeURLState(state.path)
     }
-    this.__start(state)
+    this.open(state)
   }
 
   /**
@@ -256,13 +302,12 @@ class Router {
    * @param {State} state 状态
    * @param {boolean} isHistory 此状态是否为历史数据
    */
-  __start(state, isHistory = false) {
+  open(state, isHistory = false) {
     let activitiyHandlers = this.activities.get(state.path.name)
     if (!activitiyHandlers) {
       activitiyHandlers = [this.notFound]
     }
     activitiyHandlers = activitiyHandlers.slice()
-    activitiyHandlers.push(...this.commonActivities.slice())
     if (isHistory) {
       let destroiyHandler = this.destroies.get(state.path.name)
       if (destroiyHandler) {
@@ -301,7 +346,7 @@ class Router {
 
   onpopstate(e) {
     let state = State.Create(e.state)
-    this.__start(state, true)
+    this.open(state, true)
   }
 
   encodeURLState(href) {
@@ -397,5 +442,11 @@ class Router {
     }
 
     return path
+  }
+}
+
+function assert1(ok, errorMessage) {
+  if (ok) {
+    throw new Error(errorMessage)
   }
 }

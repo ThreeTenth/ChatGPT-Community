@@ -1,70 +1,94 @@
+/*
+ * 应用的业务逻辑部分
+ */
 
 const surface = document.getElementById("surface")
+const indexState = new State("/")
+const loginState = new State("/login")
+const createState = new State("/create")
 
 /**
- * 
- * @param {Context} c 路由上下文对象
+ * @param {Context} c
  */
-var auth = (c) => {
-  console.log(c.state.title);
-  c.next()
+function authn(c) {
+  let userSession = localStorage.getItem("userSession")
+  if (userSession) {
+    c.next()
+  } else {
+    router.start(loginState)
+  }
 }
 
 /**
- * 
- * @param {Context} c 路由上下文对象
+ * @param {Context} c
  */
-var indexCompose = (c) => {
-  surface.innerHTML = ""
-
-  let h2 = document.createElement("h2")
-  h2.innerText = c.state.title
-  surface.appendChild(h2)
-
-  let a = document.createElement("a")
-  a.innerText = aboutState.url
-  a.href = aboutState.url
-  a.onclick = () => {
-    router.start(aboutState)
-    return false
-  }
-  surface.appendChild(a)
-
-  document.title = c.state.title
-
-  console.log(c);
+function login(c) {
+  let container = div()
+  container.innerText = "Login"
+  surface.appendChild(container)
   c.push(false)
 }
 
 /**
- * 
- * @param {Context} c 路由上下文对象
+ * @param {Context} c
  */
-function _404Compose(c) {
-  surface.innerHTML = ""
-
-  let a = document.createElement('a')
-  a.href = '/'
-  a.onclick = () => {
-    router.start(indexState)
-    return false
-  }
-  let h2 = document.createElement("h2")
-  h2.innerText = `404 Not Found (${c.state.title})`
-  a.appendChild(h2)
-  surface.appendChild(a)
-
-  c.push(false)
+function index(c) {
+  let container = div()
+  let createButton = button('Create', {
+    onclick: () => {
+      router.start(createState)
+    }
+  })
+  container.appendChild(createButton)
+  surface.appendChild(container)
 }
 
-const indexState = new State("/", "首页")
-const aboutState = new State(new Path("/*name", { name: "about" }), "关于")
-const threadState = new State("/thread", "线程")
+/**
+ * @param {Context} c
+ */
+function create(c) {
+  let container = div()
+  container.innerText = "Create"
+  surface.appendChild(container)
+  c.push(true)
+}
 
 const router = new Router()
 
-router.use(auth)
-router.bind("/", indexCompose)
-// router.bind("/*name", _404Compose)
+router.bind("/", index)
+router.bind("/login", login)
+
+const authRouter = router.group("/")
+authRouter.use(authn)
+authRouter.bind("/create", create)
 
 router.launch()
+
+/**
+ * 返回一个 div 元素
+ * @returns div 元素
+ */
+function div() {
+  let div = document.createElement("div")
+  return div
+}
+
+function button(text, {
+  onclick = () => { },
+}) {
+  let button = document.createElement('button')
+  button.textContent = text
+  button.onclick = onclick
+  return button
+}
+
+function model() {
+  let div = document.createElement("div")
+  div.style.position = 'fixed'
+  div.style.zIndex = 999
+  div.style.left = 0
+  div.style.right = 0
+  div.style.top = 0
+  div.style.bottom = 0
+  return div
+}

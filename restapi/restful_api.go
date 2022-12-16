@@ -231,3 +231,24 @@ func getIDAndOkJSON(c *gin.Context, handle func(id string) (interface{}, error))
 	}
 	c.JSON(http.StatusOK, &data)
 }
+
+// PostCaptcha is 更新 cloudflare 验证码
+func PostCaptcha(c *gin.Context) {
+	var captcha struct {
+		cfClearance string
+		userAgent   string
+	}
+
+	if err := c.ShouldBindJSON(&captcha); err != nil {
+		c.String(http.StatusForbidden, err.Error())
+		return
+	}
+
+	err := openai.UpdateCloudflareCaptcha(captcha.cfClearance, captcha.userAgent)
+	if err != nil {
+		c.String(http.StatusForbidden, err.Error())
+		return
+	}
+
+	c.String(http.StatusOK, "OK")
+}

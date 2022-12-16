@@ -224,7 +224,45 @@ var sessionRequestHeader = map[string]string{
 	"Accept-Encoding": "gzip, deflate, br",
 }
 
-var cfClearance, userAgent string
+var cloudflareClearance, captchaUserAgent string
+
+// UpdateCloudflareCaptcha is 更新 cf 的验证码数据
+func UpdateCloudflareCaptcha(cfClearance, userAgent string) error {
+	cloudflareClearance = cfClearance
+	captchaUserAgent = userAgent
+
+	// 创建一个带 cookie 的 HTTP GET 请求
+	req, err := http.NewRequest("GET", "https://chat.openai.com", nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("User-Agent", userAgent)
+
+	// 设置请求的 cookie
+	req.AddCookie(&http.Cookie{Name: "cf_clearance", Value: cfClearance})
+
+	// 发送请求
+	response, err := chatGPTClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	resBodyBytes, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return err
+	}
+
+	if response.StatusCode != http.StatusOK {
+		return &HTTPStatusError{response.StatusCode, response.Status, string(resBodyBytes)}
+	}
+
+	cloudflareClearance = cfClearance
+	captchaUserAgent = userAgent
+
+	return nil
+}
 
 // UpdateChatGPTSession 更新 chat gpt 认证信息
 func UpdateChatGPTSession(sessionToken string) (*Token, error) {
@@ -240,11 +278,11 @@ func UpdateChatGPTSession(sessionToken string) (*Token, error) {
 	// for k, v := range sessionRequestHeader {
 	// 	req.Header.Set(k, v)
 	// }
-	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("User-Agent", captchaUserAgent)
 
 	// 设置请求的 cookie
 	req.AddCookie(&http.Cookie{Name: "__Secure-next-auth.session-token", Value: sessionToken})
-	req.AddCookie(&http.Cookie{Name: "cf_clearance", Value: cfClearance})
+	req.AddCookie(&http.Cookie{Name: "cf_clearance", Value: cloudflareClearance})
 
 	// 发送请求
 	response, err := chatGPTClient.Do(req)

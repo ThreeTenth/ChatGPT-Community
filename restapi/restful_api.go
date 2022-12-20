@@ -2,6 +2,7 @@ package restapi
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"community.threetenth.chatgpt/db"
@@ -235,8 +236,8 @@ func getIDAndOkJSON(c *gin.Context, handle func(id string) (interface{}, error))
 // PostCaptcha is 更新 cloudflare 验证码
 func PostCaptcha(c *gin.Context) {
 	var captcha struct {
-		cfClearance string
-		userAgent   string
+		CfClearance string `json:"cfClearance"`
+		UserAgent   string `json:"userAgent"`
 	}
 
 	if err := c.ShouldBindJSON(&captcha); err != nil {
@@ -244,9 +245,14 @@ func PostCaptcha(c *gin.Context) {
 		return
 	}
 
-	err := openai.UpdateCloudflareCaptcha(captcha.cfClearance, captcha.userAgent)
+	err := openai.UpdateCloudflareCaptcha(captcha.CfClearance, captcha.UserAgent)
 	if err != nil {
-		c.String(http.StatusForbidden, err.Error())
+		var e *openai.HTTPStatusError
+		if errors.As(err, &e) {
+			c.String(e.Code, e.Text)
+		} else {
+			c.String(http.StatusInternalServerError, err.Error())
+		}
 		return
 	}
 

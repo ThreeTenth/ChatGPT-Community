@@ -80,7 +80,7 @@ func main() {
 	})
 	router.GET("/", web)
 	router.GET("/:pagename", web)
-	router.GET("/api/v1/captcha", restapi.PostCaptcha)
+	router.POST("/api/v1/captcha", restapi.PostCaptcha)
 	router.GET("/api/v1/session", restapi.UpdateChatGPTSession)
 	router.POST("/api/v1/conversation", restapi.PostChatGPTConversation)
 	router.GET("/api/v1/conversation", restapi.GetChatGPTConversation)

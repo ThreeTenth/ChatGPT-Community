@@ -228,16 +228,13 @@ var cloudflareClearance, captchaUserAgent string
 
 // UpdateCloudflareCaptcha is 更新 cf 的验证码数据
 func UpdateCloudflareCaptcha(cfClearance, userAgent string) error {
-	cloudflareClearance = cfClearance
-	captchaUserAgent = userAgent
-
 	// 创建一个带 cookie 的 HTTP GET 请求
-	req, err := http.NewRequest("GET", "https://chat.openai.com", nil)
+	req, err := http.NewRequest("GET", "https://chat.openai.com/chat", nil)
 	if err != nil {
 		return err
 	}
 
-	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("user-agent", userAgent)
 
 	// 设置请求的 cookie
 	req.AddCookie(&http.Cookie{Name: "cf_clearance", Value: cfClearance})
